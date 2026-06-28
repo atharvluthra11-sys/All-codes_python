@@ -1,0 +1,2343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>☠️ OUTPOST APOCALYPSE: 3D ZOMBIE DEFENSE ☠️</title>
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050202;
+            font-family: 'Oswald', sans-serif;
+            user-select: none;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* CRT Screen Scanline Overlay */
+        .crt::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.04));
+            z-index: 99;
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+
+        /* Damage Blood vignette overlay */
+        #blood-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            box-shadow: inset 0 0 100px rgba(139, 0, 0, 0);
+            pointer-events: none;
+            z-index: 8;
+            transition: box-shadow 0.1s ease;
+        }
+
+        #hud {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            padding: 20px 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 5;
+            color: #fff;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            width: 100%;
+        }
+
+        .hud-card {
+            background: rgba(15, 5, 5, 0.85);
+            border: 2px solid #8b0000;
+            box-shadow: 0 0 15px rgba(139, 0, 0, 0.4);
+            padding: 10px 20px;
+            border-radius: 4px;
+            pointer-events: auto;
+        }
+
+        .hud-title {
+            font-size: 14px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+
+        .hud-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #ff3333;
+            text-shadow: 0 0 8px rgba(255, 51, 51, 0.6);
+        }
+
+        #score-display {
+            color: #ffb700;
+            text-shadow: 0 0 8px rgba(255, 183, 0, 0.6);
+        }
+
+        .hud-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 40%;
+            text-align: center;
+        }
+
+        .health-bar-container {
+            width: 100%;
+            height: 16px;
+            background: #200;
+            border: 2px solid #ff3333;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(255, 51, 51, 0.3);
+            margin-top: 5px;
+        }
+
+        #health-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #8b0000, #ff3333);
+            transition: width 0.1s ease;
+        }
+
+        /* Boss Health Overlay */
+        #boss-health-card {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50%;
+            background: rgba(10, 0, 0, 0.9);
+            border: 2px dashed #ff0000;
+            padding: 15px 25px;
+            border-radius: 6px;
+            text-align: center;
+            display: none;
+            z-index: 6;
+            animation: pulse-border 1.5s infinite alternate;
+        }
+
+        @keyframes pulse-border {
+            from { border-color: #ff0000; box-shadow: 0 0 10px #ff0000; }
+            to { border-color: #550000; box-shadow: 0 0 2px #550000; }
+        }
+
+        #boss-name {
+            font-family: 'Creepster', cursive;
+            font-size: 28px;
+            color: #ff0000;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+            margin-bottom: 5px;
+        }
+
+        #boss-health-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff6666);
+        }
+
+        /* Large Notification Banner */
+        #notification-banner {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Creepster', cursive;
+            font-size: 60px;
+            color: #ff1111;
+            text-align: center;
+            text-shadow: 0 0 20px #ff0000, 0 0 40px #000;
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+            animation: zoom-pulse 0.5s ease-out;
+        }
+
+        @keyframes zoom-pulse {
+            0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        /* Screen overlays: Menu, Game Over, Victory */
+        .screen-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 3, 3, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            color: #fff;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .screen-overlay h1 {
+            font-family: 'Creepster', cursive;
+            font-size: 72px;
+            color: #ff1111;
+            text-shadow: 0 0 20px rgba(255, 17, 17, 0.8);
+            margin-bottom: 10px;
+            letter-spacing: 3px;
+        }
+
+        .screen-overlay p {
+            font-size: 20px;
+            color: #ccc;
+            margin-bottom: 25px;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        .screen-overlay .instructions {
+            background: rgba(40, 10, 10, 0.4);
+            border: 1px solid #ff3333;
+            padding: 15px 30px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+            font-size: 16px;
+            color: #e5e5e5;
+            text-align: left;
+        }
+
+        .screen-overlay .instructions li {
+            margin-bottom: 8px;
+        }
+
+        .menu-btn {
+            background: linear-gradient(135deg, #8b0000, #ff1111);
+            color: #fff;
+            font-family: 'Oswald', sans-serif;
+            font-size: 24px;
+            font-weight: bold;
+            padding: 15px 45px;
+            border: 2px solid #ff6666;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 17, 17, 0.5);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+        }
+
+        .menu-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 35px rgba(255, 17, 17, 0.9);
+            background: linear-gradient(135deg, #a00000, #ff3333);
+        }
+
+        #game-over-screen, #victory-screen {
+            display: none;
+        }
+
+        #weapon-status {
+            font-size: 14px;
+            color: #00ffcc;
+            text-shadow: 0 0 5px rgba(0, 255, 204, 0.6);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+    </style>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body class="crt">
+
+    <div id="blood-overlay"></div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-top">
+            <div class="hud-card">
+                <div class="hud-title">Score</div>
+                <div id="score-display" class="hud-value">0</div>
+            </div>
+            
+            <div class="hud-center">
+                <div class="hud-title" style="color: #ff3333; font-weight: bold;">BARRICADE INTEGRITY</div>
+                <div class="health-bar-container">
+                    <div id="health-fill"></div>
+                </div>
+            </div>
+
+            <div class="hud-card" style="text-align: right;">
+                <div class="hud-title">Threat Level</div>
+                <div id="threat-display" class="hud-value">1</div>
+                <div id="weapon-status">CALIBER: 7.62MM AUTO</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Boss Health Bar -->
+    <div id="boss-health-card">
+        <div id="boss-name">ALPHA MUTANT</div>
+        <div class="health-bar-container" style="height: 12px; margin-top: 0; border-color: #ff0000;">
+            <div id="boss-health-fill"></div>
+        </div>
+    </div>
+
+    <!-- Notification Banner -->
+    <div id="notification-banner">BOSS ALARM</div>
+
+    <!-- Main Menu Screen -->
+    <div id="main-menu" class="screen-overlay">
+        <h1>OUTPOST APOCALYPSE</h1>
+        <p>A bloodthirsty horde of zombies is storming the outpost barrier. You are the last line of defense. Take charge of the heavy machine gun mount and paint the field red.</p>
+        
+        <div class="instructions">
+            <h3>DEFENSE MANUAL:</h3>
+            <ul style="padding-left: 20px;">
+                <li><strong>Aim:</strong> Move your cursor to rotate the gun & searchlight.</li>
+                <li><strong>Shoot:</strong> Press and hold Left Click (or tap screen) to fire the machine gun.</li>
+                <li><strong>Threat System:</strong> Survival increases the threat difficulty and zombie speeds.</li>
+                <li><strong>Ballistic Bullets:</strong> Reaching <strong>Threat Level 5</strong> triggers automatic reload to explosive ballistic rounds that blast 3-4 zombies.</li>
+                <li><strong>Boss Fights:</strong> Defeat the 3 Giant Alpha mutants that emerge from the fog.</li>
+            </ul>
+        </div>
+        <button class="menu-btn" onclick="startGame()">Engage Defense</button>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="screen-overlay">
+        <h1>OUTPOST OVERRUN</h1>
+        <p id="final-stats">You were slaughtered. Score: 0 | Bosses Slain: 0</p>
+        <button class="menu-btn" onclick="restartGame()">Redeploy</button>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory-screen" class="screen-overlay">
+        <h1 style="color: #00ff88; text-shadow: 0 0 20px rgba(0,255,136,0.8);">OUTPOST SECURED</h1>
+        <p>Unbelievable! You held the barricade, killed all 3 Alpha Mutants, and survived the apocalypse. You are a legendary defender.</p>
+        <button class="menu-btn" style="background: linear-gradient(135deg, #005f30, #00cc66); border-color: #66ffb3; box-shadow: 0 0 20px rgba(0,255,136,0.4);" onclick="continueEndless()">Continue Endless Survival</button>
+        <button class="menu-btn" style="margin-top: 15px; background: #222; border-color: #555;" onclick="restartGame()">Restart Campaign</button>
+    </div>
+
+    <!-- WebGL Render target -->
+    <div id="canvas-container"></div>
+
+    <script>
+        // Game State Variables
+        let scene, camera, renderer;
+        let score = 0;
+        let barricadeHP = 100;
+        let maxBarricadeHP = 100;
+        let threatLevel = 1;
+        let gameActive = false;
+        let gameEnded = false;
+        let endlessMode = false;
+        
+        let isMouseDown = false;
+        let time = 0;
+        
+        // Weapon variables
+        let ballisticBulletsActive = false;
+        let fireRateCounter = 0;
+        let recoilOffset = 0;
+        
+        // Entity arrays
+        let bullets = [];
+        let zombies = [];
+        let particles = [];
+        let gibs = [];
+        let bloodSplatters = [];
+        let explosions = [];
+        let fireParticles = [];
+
+        // Game Constants & Configuration (Significantly increased swarm sizing)
+        let spawnRate = 50; // Level 1 starts with faster swarms (previously 85/75)
+        let spawnTimer = 0;
+        let baseZombieSpeed = 0.22;
+        let currentZombieSpeed = 0.22;
+        
+        // Door positions
+        const doorPositions = [-22, 0, 22];
+        
+        // Boss fight variables (Drastically increased HP)
+        let bossActive = false;
+        let bossStage = 0; // 0: none, 1: boss 1, 2: boss 2, 3: boss 3
+        let bossEntity = null;
+        let bossesKilled = 0;
+        const bossMilestones = [12000, 22000, 35000]; // Score thresholds for bosses
+        const bossHPConfig = [300000, 400000, 600000]; // Adjusted HP for bosses 2 & 3
+
+        // Ballistic progression tier: 0 = level 5 standard, 1 = after boss 2, 2 = maxed after boss 3
+        let ballisticTier = 0;
+        // Post-boss-3 zombie mutation: HP multiplier + speed reduction
+        let mutantZombieHPMult = 1.0;
+        let mutantZombieSpeedMult = 1.0;
+        // Soldier allies
+        let soldiers = [];
+        let soldierFireCooldown = 30; // frames between shots;
+        
+        // Raycasting & aim setup
+        const container = document.getElementById('canvas-container');
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const groundAimPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        const planeIntersection = new THREE.Vector3();
+        
+        // 3D meshes references
+        let turretGroup, turretBarrel, muzzleFlashMesh, flashlightSpotlight;
+        let barricadeMesh;
+        let ambientLight;
+
+        // Screen Shake
+        let screenShakeAmount = 0;
+
+        // Sound Synthesis (Web Audio API)
+        let audioCtx = null;
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playShotSound() {
+            if (!audioCtx) return;
+            // Gunshot synth
+            const bufferSize = audioCtx.sampleRate * 0.08;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = ballisticBulletsActive ? 600 : 1100;
+            filter.Q.value = 4;
+
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(ballisticBulletsActive ? 180 : 260, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.06);
+
+            oscGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.06);
+
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(ballisticBulletsActive ? 0.8 : 0.5, audioCtx.currentTime);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+
+            noise.connect(filter);
+            filter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+
+            osc.connect(oscGain);
+            oscGain.connect(audioCtx.destination);
+
+            noise.start();
+            osc.start();
+            noise.stop(audioCtx.currentTime + 0.08);
+            osc.stop(audioCtx.currentTime + 0.08);
+        }
+
+        function playExplosionSound() {
+            if (!audioCtx) return;
+            // Low deep blast sound
+            const bufferSize = audioCtx.sampleRate * 0.7;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(400, audioCtx.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.5);
+
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(1.8, audioCtx.currentTime);
+            noiseGain.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + 0.7);
+
+            const subOsc = audioCtx.createOscillator();
+            const subGain = audioCtx.createGain();
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(100, audioCtx.currentTime);
+            subOsc.frequency.linearRampToValueAtTime(20, audioCtx.currentTime + 0.4);
+
+            subGain.gain.setValueAtTime(1.5, audioCtx.currentTime);
+            subGain.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + 0.5);
+
+            noise.connect(filter);
+            filter.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+
+            subOsc.connect(subGain);
+            subGain.connect(audioCtx.destination);
+
+            noise.start();
+            subOsc.start();
+            noise.stop(audioCtx.currentTime + 0.7);
+            subOsc.stop(audioCtx.currentTime + 0.7);
+        }
+
+        function playGroanSound(isBoss = false) {
+            if (!audioCtx) return;
+            // Eerie throat FM synth groan
+            const carrier = audioCtx.createOscillator();
+            const modulator = audioCtx.createOscillator();
+            const modGain = audioCtx.createGain();
+            const gain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            carrier.type = 'sawtooth';
+            modulator.type = 'sine';
+
+            carrier.frequency.setValueAtTime(isBoss ? 45 : 95 + Math.random() * 40, audioCtx.currentTime);
+            carrier.frequency.linearRampToValueAtTime(isBoss ? 30 : 60, audioCtx.currentTime + (isBoss ? 1.4 : 0.7));
+
+            modulator.frequency.value = isBoss ? 8 : 14;
+            modGain.gain.value = isBoss ? 60 : 35;
+
+            filter.type = 'bandpass';
+            filter.frequency.value = isBoss ? 200 : 420;
+            filter.Q.value = 1.2;
+
+            gain.gain.setValueAtTime(isBoss ? 0.6 : 0.25, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (isBoss ? 1.4 : 0.7));
+
+            modulator.connect(modGain);
+            modGain.connect(carrier.frequency);
+            carrier.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            carrier.start();
+            modulator.start();
+            carrier.stop(audioCtx.currentTime + (isBoss ? 1.4 : 0.7));
+            modulator.stop(audioCtx.currentTime + (isBoss ? 1.4 : 0.7));
+        }
+
+        function playStompSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(75, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(15, audioCtx.currentTime + 0.3);
+
+            gain.gain.setValueAtTime(1.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        }
+
+        function playClawSound() {
+            if (!audioCtx) return;
+            // Scratch / metal tear thump
+            const osc = audioCtx.createOscillator();
+            const oscGain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(40, audioCtx.currentTime + 0.15);
+            
+            const bufferSize = audioCtx.sampleRate * 0.15;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const noiseGain = audioCtx.createGain();
+            
+            oscGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+            
+            noiseGain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+            
+            osc.connect(oscGain);
+            oscGain.connect(audioCtx.destination);
+            
+            noise.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+            
+            osc.start();
+            noise.start();
+            osc.stop(audioCtx.currentTime + 0.15);
+            noise.stop(audioCtx.currentTime + 0.15);
+        }
+
+        function playUpgradeSound() {
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(250, now);
+            osc.frequency.setValueAtTime(375, now + 0.15);
+            osc.frequency.setValueAtTime(560, now + 0.3);
+            osc.frequency.setValueAtTime(840, now + 0.45);
+
+            gain.gain.setValueAtTime(0.18, now);
+            gain.gain.exponentialRampToValueAtTime(0.005, now + 0.6);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(now + 0.6);
+        }
+
+        function playAlarmSound() {
+            if (!audioCtx) return;
+            const now = audioCtx.currentTime;
+            for (let i = 0; i < 2; i++) {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(320 + i * 5, now);
+                osc.frequency.linearRampToValueAtTime(450 + i * 5, now + 0.4);
+                osc.frequency.linearRampToValueAtTime(320 + i * 5, now + 0.8);
+
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(now + 0.85);
+            }
+        }
+
+        // Initialize 3D Engine
+        function init3D() {
+            scene = new THREE.Scene();
+            // Spooky red-tinted dark fog (Decreased density from 0.018 to 0.007 so the doors are visible at -120)
+            scene.fog = new THREE.FogExp2(0x0a0303, 0.007);
+
+            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            // Adjusted camera position and lookAt angle down so player can see much further down the lane
+            camera.position.set(0, 15, 60);
+            camera.lookAt(0, 3, -50);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Brightened Ambient light
+            ambientLight = new THREE.AmbientLight(0x352b30, 2.5);
+            scene.add(ambientLight);
+
+            // Moonlight / Overhead sky light
+            const moonLight = new THREE.DirectionalLight(0x556b85, 2.2);
+            moonLight.position.set(20, 60, -30);
+            moonLight.castShadow = true;
+            moonLight.shadow.mapSize.width = 1024;
+            moonLight.shadow.mapSize.height = 1024;
+            moonLight.shadow.camera.near = 10;
+            moonLight.shadow.camera.far = 200;
+            const d = 50;
+            moonLight.shadow.camera.left = -d;
+            moonLight.shadow.camera.right = d;
+            moonLight.shadow.camera.top = d;
+            moonLight.shadow.camera.bottom = -d;
+            scene.add(moonLight);
+
+            // Procedural Mud/Blood-Soaked Ground
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#181210';
+            ctx.fillRect(0, 0, 512, 512);
+            // Dirt grain
+            for(let i=0; i<20000; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#100b09' : '#221915';
+                ctx.fillRect(Math.random()*512, Math.random()*512, 2, 2);
+            }
+            // Blood stains on ground pattern
+            ctx.fillStyle = '#3a0808';
+            for(let i=0; i<40; i++) {
+                ctx.beginPath();
+                ctx.arc(Math.random()*512, Math.random()*512, 10 + Math.random()*25, 0, Math.PI*2);
+                ctx.fill();
+            }
+            // Grass tufts
+            ctx.fillStyle = '#1c2415';
+            for(let i=0; i<600; i++) {
+                ctx.fillRect(Math.random()*512, Math.random()*512, 3, 6);
+            }
+
+            const groundTexture = new THREE.CanvasTexture(canvas);
+            groundTexture.wrapS = THREE.RepeatWrapping;
+            groundTexture.wrapT = THREE.RepeatWrapping;
+            groundTexture.repeat.set(10, 15);
+
+            const groundGeo = new THREE.PlaneGeometry(160, 260);
+            const groundMat = new THREE.MeshStandardMaterial({ 
+                map: groundTexture, 
+                roughness: 0.85, 
+                metalness: 0.1 
+            });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.set(0, 0, -20);
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Barricade (Player Base Barrier at Z = 32)
+            const barricadeGroup = new THREE.Group();
+            barricadeGroup.position.set(0, 0, 32);
+
+            const barricadeBaseGeo = new THREE.BoxGeometry(66, 4.0, 2.0);
+            const rustedMetalMat = new THREE.MeshStandardMaterial({ 
+                color: 0x3d302b, 
+                roughness: 0.7, 
+                metalness: 0.75 
+            });
+            barricadeMesh = new THREE.Mesh(barricadeBaseGeo, rustedMetalMat);
+            barricadeMesh.position.y = 2.0;
+            barricadeMesh.castShadow = true;
+            barricadeMesh.receiveShadow = true;
+            barricadeGroup.add(barricadeMesh);
+
+            // Add wooden reinforcement boards
+            const boardMat = new THREE.MeshStandardMaterial({ color: 0x472d1f, roughness: 0.9 });
+            for(let x = -30; x <= 30; x += 12) {
+                const boardGeo = new THREE.BoxGeometry(1.6, 5.5, 0.4);
+                const board = new THREE.Mesh(boardGeo, boardMat);
+                board.position.set(x + (Math.random()-0.5)*2, 2.2, 1.1);
+                board.rotation.z = (Math.random()-0.5)*0.3;
+                board.castShadow = true;
+                barricadeGroup.add(board);
+            }
+            scene.add(barricadeGroup);
+
+            // Generate Environment decorations
+            generateEnvironment();
+
+            // Heavy Machine Gun Turret Model (Z = 35)
+            turretGroup = new THREE.Group();
+            turretGroup.position.set(0, 0, 36.5);
+
+            // Stand
+            const standGeo = new THREE.CylinderGeometry(0.8, 1.4, 4.2, 12);
+            const darkSteelMat = new THREE.MeshStandardMaterial({ color: 0x1d1e1f, metalness: 0.9, roughness: 0.25 });
+            const stand = new THREE.Mesh(standGeo, darkSteelMat);
+            stand.position.y = 2.1;
+            stand.castShadow = true;
+            turretGroup.add(stand);
+
+            // Swivel Head
+            const headGeo = new THREE.BoxGeometry(2.0, 1.2, 2.0);
+            const swivelHead = new THREE.Mesh(headGeo, darkSteelMat);
+            swivelHead.position.y = 4.2;
+            swivelHead.castShadow = true;
+            turretGroup.add(swivelHead);
+
+            // Barrels & Weapon Body Group
+            turretBarrel = new THREE.Group();
+            turretBarrel.position.set(0, 4.6, 0.0);
+
+            // Weapon Body
+            const bodyGeo = new THREE.BoxGeometry(2.4, 1.8, 4.0);
+            const gunBody = new THREE.Mesh(bodyGeo, darkSteelMat);
+            gunBody.position.set(0, 0.5, 0.6);
+            gunBody.castShadow = true;
+            turretBarrel.add(gunBody);
+
+            // Dual Gun Barrels
+            const barrelGeo = new THREE.CylinderGeometry(0.35, 0.35, 9.0, 16);
+            barrelGeo.rotateX(-Math.PI / 2); // Orient forward along Z
+            
+            const brassMat = new THREE.MeshStandardMaterial({ color: 0xbc9d60, metalness: 0.9, roughness: 0.2 });
+            const leftBarrel = new THREE.Mesh(barrelGeo, brassMat);
+            leftBarrel.position.set(-0.6, 0.5, -3.2);
+            leftBarrel.castShadow = true;
+            
+            const rightBarrel = leftBarrel.clone();
+            rightBarrel.position.x = 0.6;
+            
+            turretBarrel.add(leftBarrel);
+            turretBarrel.add(rightBarrel);
+
+            // Ammo Box attached to side
+            const ammoBoxGeo = new THREE.BoxGeometry(1.5, 1.8, 2.5);
+            const ammoBoxMat = new THREE.MeshStandardMaterial({ color: 0x2b3826, roughness: 0.6 });
+            const ammoBox = new THREE.Mesh(ammoBoxGeo, ammoBoxMat);
+            ammoBox.position.set(1.9, 0.5, 0.8);
+            ammoBox.rotation.y = 0.15;
+            ammoBox.castShadow = true;
+            turretBarrel.add(ammoBox);
+
+            // Spotlight / Searchlight attached to gun mount
+            const flashlightGeo = new THREE.CylinderGeometry(0.8, 1.2, 2.5, 16);
+            flashlightGeo.rotateX(-Math.PI / 2);
+            const reflectorMat = new THREE.MeshBasicMaterial({ color: 0xffffee });
+            const flashlightMesh = new THREE.Mesh(flashlightGeo, darkSteelMat);
+            flashlightMesh.position.set(-1.8, 1.2, 0.5);
+            flashlightMesh.castShadow = true;
+            
+            const lightLensGeo = new THREE.CircleGeometry(1.1, 16);
+            const lightLens = new THREE.Mesh(lightLensGeo, reflectorMat);
+            lightLens.position.set(-1.8, 1.2, -0.76);
+            lightLens.rotation.y = Math.PI;
+            turretBarrel.add(flashlightMesh);
+            turretBarrel.add(lightLens);
+
+            // Muzzle Flash Mesh (glowing cone)
+            const flashGeo = new THREE.ConeGeometry(1.6, 3.8, 8);
+            flashGeo.rotateX(-Math.PI / 2);
+            flashGeo.translate(0, 0, -1.9); // offset to tip
+            const flashMat = new THREE.MeshBasicMaterial({ 
+                color: 0xff8800, 
+                transparent: true, 
+                opacity: 0.9, 
+                blending: THREE.AdditiveBlending 
+            });
+            muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
+            muzzleFlashMesh.position.set(0, 0.5, -8.2); // Barrel tips
+            muzzleFlashMesh.visible = false;
+            turretBarrel.add(muzzleFlashMesh);
+
+            turretGroup.add(turretBarrel);
+            scene.add(turretGroup);
+
+            // Flashlight Spotlight source
+            flashlightSpotlight = new THREE.SpotLight(0xffffff, 10.0, 180, Math.PI / 4.2, 0.5, 1.0);
+            flashlightSpotlight.position.set(0, 4.6, 36.5);
+            flashlightSpotlight.castShadow = true;
+            flashlightSpotlight.shadow.mapSize.width = 1024;
+            flashlightSpotlight.shadow.mapSize.height = 1024;
+            scene.add(flashlightSpotlight);
+            scene.add(flashlightSpotlight.target);
+
+            // Resize and input handlers
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('touchmove', onTouchMove, { passive: false });
+            
+            window.addEventListener('mousedown', (e) => { 
+                if (gameActive && !gameEnded) {
+                    initAudio();
+                    isMouseDown = true; 
+                }
+            });
+            window.addEventListener('mouseup', () => { isMouseDown = false; });
+            window.addEventListener('touchstart', (e) => {
+                if (gameActive && !gameEnded) {
+                    initAudio();
+                    isMouseDown = true;
+                    updateInputCoords(e.touches[0]);
+                }
+            }, { passive: true });
+            window.addEventListener('touchend', () => { isMouseDown = false; });
+            
+            window.addEventListener('keydown', (e) => {
+                if (gameEnded && e.code === "Space") {
+                    restartGame();
+                }
+            });
+        }
+
+        // Procedural Red Doors at spawn distance
+        function createRedDoor3D(x, z) {
+            const doorGroup = new THREE.Group();
+            doorGroup.position.set(x, 0, z);
+
+            // Door Frame posts
+            const pillarGeo = new THREE.BoxGeometry(1.4, 12, 1.4);
+            const frameMat = new THREE.MeshStandardMaterial({ color: 0x2c2c2c, metalness: 0.8, roughness: 0.4 });
+            
+            const leftPillar = new THREE.Mesh(pillarGeo, frameMat);
+            leftPillar.position.set(-3.8, 6, 0);
+            leftPillar.castShadow = true;
+            doorGroup.add(leftPillar);
+
+            const rightPillar = leftPillar.clone();
+            rightPillar.position.x = 3.8;
+            doorGroup.add(rightPillar);
+
+            const headerGeo = new THREE.BoxGeometry(9.0, 1.4, 1.4);
+            const header = new THREE.Mesh(headerGeo, frameMat);
+            header.position.set(0, 12, 0);
+            header.castShadow = true;
+            doorGroup.add(header);
+
+            // Blood Red Door Slab
+            const doorSlabGeo = new THREE.BoxGeometry(6.6, 11.0, 0.8);
+            const doorSlabMat = new THREE.MeshStandardMaterial({ 
+                color: 0xcc1111, 
+                emissive: 0x4a0000,
+                roughness: 0.5,
+                metalness: 0.7 
+            });
+            const doorSlab = new THREE.Mesh(doorSlabGeo, doorSlabMat);
+            doorSlab.position.set(0, 5.5, -0.2);
+            doorSlab.castShadow = true;
+            doorGroup.add(doorSlab);
+
+            // Glowing red light above door (Disabled shadows on pointlights to reduce rendering overhead)
+            const doorLight = new THREE.PointLight(0xff0000, 4.0, 20, 1.5);
+            doorLight.position.set(0, 12, 1.2);
+            doorLight.castShadow = false;
+            doorGroup.add(doorLight);
+
+            // Indicator lamp
+            const lampGeo = new THREE.SphereGeometry(0.5, 8, 8);
+            const lampMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const lamp = new THREE.Mesh(lampGeo, lampMat);
+            lamp.position.set(0, 12.8, 0.8);
+            doorGroup.add(lamp);
+
+            scene.add(doorGroup);
+        }
+
+        // Generate procedural forest, fences, fire barrels, and red spawn doors
+        function generateEnvironment() {
+            // Side metallic/wooden fence barriers
+            const postGeo = new THREE.CylinderGeometry(0.18, 0.18, 5.0, 8);
+            const barGeo = new THREE.CylinderGeometry(0.08, 0.08, 15.5, 8);
+            barGeo.rotateX(-Math.PI / 2);
+            const steelMat = new THREE.MeshStandardMaterial({ color: 0x303030, metalness: 0.8, roughness: 0.5 });
+
+            for(let side = -1; side <= 1; side += 2) {
+                const xPos = side * 33.5;
+                for(let z = -120; z <= 30; z += 15) {
+                    // Fence posts
+                    const post = new THREE.Mesh(postGeo, steelMat);
+                    post.position.set(xPos, 2.5, z);
+                    post.castShadow = true;
+                    scene.add(post);
+
+                    // Rails connecting them
+                    if(z < 30) {
+                        const rail1 = new THREE.Mesh(barGeo, steelMat);
+                        rail1.position.set(xPos, 1.5, z + 7.5);
+                        const rail2 = new THREE.Mesh(barGeo, steelMat);
+                        rail2.position.set(xPos, 3.2, z + 7.5);
+                        scene.add(rail1);
+                        scene.add(rail2);
+                    }
+                }
+            }
+
+            // Spooky Pine Trees
+            for (let i = 0; i < 40; i++) {
+                // Left side forest
+                const lx = -38 - Math.random() * 22;
+                const lz = -120 + i * 6.5 + (Math.random() - 0.5) * 5;
+                createTree3D(lx, lz);
+
+                // Right side forest
+                const rx = 38 + Math.random() * 22;
+                const rz = -120 + i * 6.5 + (Math.random() - 0.5) * 5;
+                createTree3D(rx, rz);
+            }
+
+            // Scatter rocks on ground edges
+            const rockColors = [0x3c3c3a, 0x48423f, 0x2c2b29];
+            for (let i = 0; i < 30; i++) {
+                const side = Math.random() > 0.5 ? -1 : 1;
+                const rx = side * (34 + Math.random() * 15);
+                const rz = (Math.random() - 0.5) * 200;
+                
+                const size = 1.0 + Math.random() * 2.5;
+                const rockGeo = new THREE.DodecahedronGeometry(size, 1);
+                
+                // Distort rock
+                const posAttr = rockGeo.attributes.position;
+                for(let v = 0; v < posAttr.count; v++) {
+                    posAttr.setX(v, posAttr.getX(v) * (0.8 + Math.random() * 0.4));
+                    posAttr.setY(v, posAttr.getY(v) * (0.6 + Math.random() * 0.5));
+                    posAttr.setZ(v, posAttr.getZ(v) * (0.8 + Math.random() * 0.4));
+                }
+                rockGeo.computeVertexNormals();
+
+                const rockMat = new THREE.MeshStandardMaterial({ 
+                    color: rockColors[Math.floor(Math.random() * rockColors.length)], 
+                    roughness: 0.9 
+                });
+                const rock = new THREE.Mesh(rockGeo, rockMat);
+                rock.position.set(rx, size * 0.4, rz);
+                rock.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+                rock.castShadow = true;
+                rock.receiveShadow = true;
+                scene.add(rock);
+            }
+
+            // Add 2 Glowing Fire Barrels (Disabled shadows to boost framerate)
+            createFireBarrel3D(-31, -40);
+            createFireBarrel3D(31, -5);
+
+            // Add 3 Red Doors at spawn distance
+            createRedDoor3D(-22, -120);
+            createRedDoor3D(0, -120);
+            createRedDoor3D(22, -120);
+        }
+
+        // Procedural Tree Generator
+        function createTree3D(x, z) {
+            const treeGroup = new THREE.Group();
+            treeGroup.position.set(x, 0, z);
+
+            const trunkHeight = 6 + Math.random() * 5;
+            const trunkGeo = new THREE.CylinderGeometry(0.35, 0.6, trunkHeight, 8);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2e1a0e, roughness: 0.95 });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = trunkHeight / 2;
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+            treeGroup.add(trunk);
+
+            // Foliage layers (Stacked Cones)
+            const foliageMat = new THREE.MeshStandardMaterial({ color: 0x0f2010, roughness: 0.9 });
+            let currentY = trunkHeight - 1.5;
+            let coneRadius = 5.0 + Math.random() * 2.0;
+            let layers = 4 + Math.floor(Math.random() * 2);
+
+            for (let i = 0; i < layers; i++) {
+                const coneHeight = 4.5 + Math.random();
+                const coneGeo = new THREE.ConeGeometry(coneRadius, coneHeight, 8);
+                const foliageLayer = new THREE.Mesh(coneGeo, foliageMat);
+                foliageLayer.position.y = currentY + coneHeight / 2;
+                foliageLayer.castShadow = true;
+                foliageLayer.receiveShadow = true;
+                
+                // Add slight organic rotation skew
+                foliageLayer.rotation.y = Math.random() * Math.PI;
+                foliageLayer.rotation.x = (Math.random() - 0.5) * 0.05;
+                foliageLayer.rotation.z = (Math.random() - 0.5) * 0.05;
+                
+                treeGroup.add(foliageLayer);
+                
+                currentY += coneHeight * 0.6;
+                coneRadius *= 0.72; // shrink radius as we stack up
+            }
+
+            // Random overall scale
+            const scale = 0.8 + Math.random() * 0.4;
+            treeGroup.scale.set(scale, scale, scale);
+            scene.add(treeGroup);
+        }
+
+        // Fire barrel with dynamic lights and flame particle spawning
+        function createFireBarrel3D(x, z) {
+            const barrelGroup = new THREE.Group();
+            barrelGroup.position.set(x, 0, z);
+
+            // Metal Barrel
+            const barrelGeo = new THREE.CylinderGeometry(1.2, 1.2, 3.2, 12);
+            const barrelMat = new THREE.MeshStandardMaterial({ 
+                color: 0x4f2b1d, 
+                roughness: 0.75, 
+                metalness: 0.65 
+            });
+            const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+            barrel.position.y = 1.6;
+            barrel.castShadow = true;
+            barrel.receiveShadow = true;
+            barrelGroup.add(barrel);
+
+            // Animated Fire Light inside barrel (Disabled shadows for 60fps)
+            const fireLight = new THREE.PointLight(0xff6600, 5.0, 50, 1.2);
+            fireLight.position.set(0, 3.1, 0);
+            fireLight.castShadow = false;
+            barrelGroup.add(fireLight);
+
+            scene.add(barrelGroup);
+
+            // Store light reference for flickering update
+            fireParticles.push({
+                barrelPos: new THREE.Vector3(x, 3.2, z),
+                light: fireLight,
+                spawnTimer: 0
+            });
+        }
+
+        // Spawns a Zombie model (Added more gore, exposed flesh, and bloody jaws)
+        function spawnZombie(isBoss = false) {
+            const zombieGroup = new THREE.Group();
+
+            // Per-zombie random skin decay variant: necrotic green, grey-purple, or yellow-brown
+            const skinVariant = Math.floor(Math.random() * 3);
+            const skinColors = [0x3e5e40, 0x5a5545, 0x4a5238];
+            const skinColor = isBoss ? 0x3d1010 : skinColors[skinVariant];
+            const clothesColor = isBoss ? 0x1a0808 : (Math.random() > 0.5 ? 0x2e3538 : 0x3b2e22);
+
+            const skinMat  = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.9, metalness: 0.0 });
+            const clothMat = new THREE.MeshStandardMaterial({ color: clothesColor, roughness: 0.95 });
+            const rawFleshMat  = new THREE.MeshBasicMaterial({ color: 0x8a0000 }); // Deep wet blood-red
+            const brightFleshMat = new THREE.MeshBasicMaterial({ color: 0xcc2200 }); // Brighter arterial red
+            const boneMat  = new THREE.MeshStandardMaterial({ color: 0xd8cfc0, roughness: 0.7 });
+            const blackMat = new THREE.MeshBasicMaterial({ color: 0x0d0d0d }); // Necrotic black
+
+            // ── TORSO ──────────────────────────────────────────────────────────
+            const torsoGeo = new THREE.BoxGeometry(3.0, 4.4, 2.0);
+            const torso = new THREE.Mesh(torsoGeo, clothMat);
+            torso.position.y = 2.2;
+            torso.castShadow = true;
+            torso.receiveShadow = true;
+            zombieGroup.add(torso);
+
+            // GORE: Large gaping chest cavity wound exposing dark interior
+            const cavityGeo = new THREE.BoxGeometry(1.4, 1.8, 0.22);
+            const cavity = new THREE.Mesh(cavityGeo, rawFleshMat);
+            cavity.position.set((Math.random()-0.5)*0.8, 2.4 + (Math.random()-0.5)*0.6, 1.02);
+            zombieGroup.add(cavity);
+
+            // GORE: 3–5 scattered wound patches (front and back) with bright interior
+            const woundCount = isBoss ? 8 : 3 + Math.floor(Math.random()*3);
+            for(let i = 0; i < woundCount; i++) {
+                const w = 0.5 + Math.random() * 0.6;
+                const h = 0.4 + Math.random() * 0.5;
+                const woundGeo = new THREE.BoxGeometry(w, h, 0.18);
+                const wound = new THREE.Mesh(woundGeo, Math.random() > 0.4 ? rawFleshMat : brightFleshMat);
+                const side = Math.random() > 0.5 ? 1.03 : -1.03;
+                wound.position.set((Math.random()-0.5)*2.2, (Math.random()-0.5)*3.5 + 2.2, side);
+                wound.rotation.z = (Math.random()-0.5)*0.4;
+                zombieGroup.add(wound);
+            }
+
+            // GORE: Necrotic black patches (dead skin blotches) on front torso
+            for(let i = 0; i < 3; i++) {
+                const blotchGeo = new THREE.BoxGeometry(0.6+Math.random()*0.5, 0.35+Math.random()*0.3, 0.12);
+                const blotch = new THREE.Mesh(blotchGeo, blackMat);
+                blotch.position.set((Math.random()-0.5)*2.6, (Math.random()-0.5)*3.8 + 2.2, 1.04);
+                zombieGroup.add(blotch);
+            }
+
+            // GORE: Exposed spine ridge down the back
+            const spineMat = new THREE.MeshStandardMaterial({ color: 0xc8bfb0, roughness: 0.6 });
+            for(let s = 0; s < 5; s++) {
+                const spineGeo = new THREE.BoxGeometry(0.28, 0.28, 0.45);
+                const spineSeg = new THREE.Mesh(spineGeo, spineMat);
+                spineSeg.position.set(0, 0.5 + s * 0.72, -1.05);
+                zombieGroup.add(spineSeg);
+            }
+
+            // GORE: Hanging intestine-like flesh strips dangling from belly tear
+            for(let f = 0; f < (isBoss ? 5 : 2); f++) {
+                const fLen = 0.6 + Math.random() * 0.8;
+                const fleshGeo = new THREE.BoxGeometry(0.18, fLen, 0.18);
+                const flesh = new THREE.Mesh(fleshGeo, rawFleshMat);
+                flesh.position.set(-0.6 + f * 0.3, 0.6 - fLen * 0.5, 1.05);
+                flesh.rotation.z = (Math.random()-0.5)*0.5;
+                zombieGroup.add(flesh);
+            }
+
+            // ── HEAD ──────────────────────────────────────────────────────────
+            const headGeo = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+            const head = new THREE.Mesh(headGeo, skinMat);
+            head.position.y = 5.2;
+            head.castShadow = true;
+            zombieGroup.add(head);
+
+            // GORE: Exposed cheekbone (white patch on side of skull)
+            const cheekGeo = new THREE.BoxGeometry(0.55, 0.4, 0.12);
+            const cheek = new THREE.Mesh(cheekGeo, boneMat);
+            cheek.position.set(0.72, 5.1, 0.55);
+            zombieGroup.add(cheek);
+
+            // GORE: Skull crack / dark necrotic forehead blotch
+            const crackGeo = new THREE.BoxGeometry(0.7, 0.3, 0.13);
+            const crack = new THREE.Mesh(crackGeo, blackMat);
+            crack.position.set((Math.random()-0.5)*0.5, 5.55, 0.81);
+            crack.rotation.z = (Math.random()-0.5)*0.6;
+            zombieGroup.add(crack);
+
+            // GORE: Screaming jaw wide open
+            const jawGeo = new THREE.BoxGeometry(1.55, 0.55, 0.95);
+            const jaw = new THREE.Mesh(jawGeo, skinMat);
+            jaw.position.set(0, 4.28, 0.42);
+            jaw.rotation.x = 0.32;
+            jaw.castShadow = true;
+            zombieGroup.add(jaw);
+
+            // Bloody gaping mouth
+            const mouthGeo = new THREE.BoxGeometry(1.3, 0.4, 0.9);
+            const mouth = new THREE.Mesh(mouthGeo, rawFleshMat);
+            mouth.position.set(0, 4.48, 0.5);
+            zombieGroup.add(mouth);
+
+            // Blood dripping from mouth
+            const droolGeo = new THREE.BoxGeometry(0.12, 0.5, 0.1);
+            const drool = new THREE.Mesh(droolGeo, brightFleshMat);
+            drool.position.set((Math.random()-0.5)*0.6, 4.05, 0.72);
+            zombieGroup.add(drool);
+
+            // ── EYES ──────────────────────────────────────────────────────────
+            // Sunken dark hollow eye sockets
+            const socketGeo = new THREE.BoxGeometry(0.32, 0.28, 0.1);
+            const lSocket = new THREE.Mesh(socketGeo, blackMat);
+            lSocket.position.set(-0.46, 5.35, 0.84);
+            zombieGroup.add(lSocket);
+            const rSocket = lSocket.clone();
+            rSocket.position.x = 0.46;
+            zombieGroup.add(rSocket);
+
+            // Glowing red pupils inside sockets
+            const eyeGeo = new THREE.SphereGeometry(0.16, 8, 8);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+            leftEye.position.set(-0.46, 5.35, 0.86);
+            const rightEye = leftEye.clone();
+            rightEye.position.x = 0.46;
+            zombieGroup.add(leftEye);
+            zombieGroup.add(rightEye);
+
+            // ── BOSS-SPECIFIC GORE ──────────────────────────────────────────
+            if (isBoss) {
+                const eyeLight = new THREE.PointLight(0xff0000, 3.0, 14, 1.5);
+                eyeLight.position.set(0, 5.3, 1.0);
+                eyeLight.castShadow = false;
+                zombieGroup.add(eyeLight);
+
+                // Full exposed rib cage — wider arched ribs
+                const ribBoneMat = new THREE.MeshStandardMaterial({ color: 0xe0d8c8, roughness: 0.6 });
+                for(let r = 0; r < 6; r++) {
+                    const ribW = 2.8 - r * 0.1;
+                    const ribGeo = new THREE.BoxGeometry(ribW, 0.22, 0.25);
+                    const rib = new THREE.Mesh(ribGeo, ribBoneMat);
+                    rib.position.set(0, 1.2 + r * 0.62, 1.16);
+                    zombieGroup.add(rib);
+                    // Rib tips (bone nubs)
+                    [-ribW/2, ribW/2].forEach(xOff => {
+                        const nubGeo = new THREE.BoxGeometry(0.18, 0.28, 0.38);
+                        const nub = new THREE.Mesh(nubGeo, ribBoneMat);
+                        nub.position.set(xOff, 1.2 + r * 0.62, 1.22);
+                        zombieGroup.add(nub);
+                    });
+                }
+
+                // Primary pulsing heart (large, dark red)
+                const heartGeo = new THREE.SphereGeometry(0.75, 16, 16);
+                const heart = new THREE.Mesh(heartGeo, new THREE.MeshBasicMaterial({ color: 0x880000 }));
+                heart.position.set(-0.4, 2.9, 1.05);
+                heart.name = "boss_heart";
+                zombieGroup.add(heart);
+
+                // Secondary exposed organ (dark purple blob)
+                const organ2Geo = new THREE.SphereGeometry(0.55, 12, 12);
+                const organ2 = new THREE.Mesh(organ2Geo, new THREE.MeshBasicMaterial({ color: 0x4a0030 }));
+                organ2.position.set(0.55, 2.2, 1.0);
+                organ2.name = "boss_organ";
+                zombieGroup.add(organ2);
+
+                // Coiled intestine tube sections below ribcage
+                for(let t = 0; t < 6; t++) {
+                    const tubeGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+                    const tube = new THREE.Mesh(tubeGeo, rawFleshMat);
+                    const angle = (t / 6) * Math.PI * 2;
+                    tube.position.set(Math.cos(angle)*0.7, 0.8, 1.0 + Math.sin(angle)*0.3);
+                    zombieGroup.add(tube);
+                }
+
+                // Spine spikes protruding from back (jagged bone shards)
+                for(let sp = 0; sp < 7; sp++) {
+                    const spikeGeo = new THREE.BoxGeometry(0.18, 0.55, 0.18);
+                    const spike = new THREE.Mesh(spikeGeo, ribBoneMat);
+                    spike.position.set((Math.random()-0.5)*0.4, 0.4 + sp * 0.6, -1.1);
+                    spike.rotation.z = (Math.random()-0.5)*0.3;
+                    zombieGroup.add(spike);
+                }
+
+                // Tumor growths — irregular dark blobs on shoulders and neck
+                const tumorMat = new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 1.0 });
+                [['-1.7', '4.5'], ['1.7', '4.5'], ['0.2', '5.9']].forEach(([tx, ty]) => {
+                    const tGeo = new THREE.SphereGeometry(0.4 + Math.random()*0.25, 8, 8);
+                    const tumor = new THREE.Mesh(tGeo, tumorMat);
+                    tumor.position.set(parseFloat(tx), parseFloat(ty), 0.4);
+                    tumor.scale.set(1, 0.7 + Math.random()*0.4, 1);
+                    zombieGroup.add(tumor);
+                });
+            }
+
+            // ── ARMS ──────────────────────────────────────────────────────────
+            const lArmPivot = new THREE.Group();
+            lArmPivot.position.set(-1.8, 4.0, 0);
+            const armGeo = new THREE.BoxGeometry(0.8, 3.8, 0.8);
+            const lArmMesh = new THREE.Mesh(armGeo, skinMat);
+            lArmMesh.position.y = -1.7;
+            lArmMesh.castShadow = true;
+            lArmPivot.add(lArmMesh);
+
+            // GORE: Bone tip knuckle claws (3 bone shard fingers)
+            for(let f = 0; f < 3; f++) {
+                const fingerGeo = new THREE.BoxGeometry(0.14, 0.55, 0.14);
+                const finger = new THREE.Mesh(fingerGeo, boneMat);
+                finger.position.set(-0.22 + f * 0.22, -3.75, 0.08);
+                finger.rotation.x = -0.25;
+                lArmPivot.add(finger);
+                // Blood on claw tip
+                const tipGeo = new THREE.BoxGeometry(0.1, 0.22, 0.1);
+                const tip = new THREE.Mesh(tipGeo, brightFleshMat);
+                tip.position.set(-0.22 + f * 0.22, -4.12, 0.08);
+                lArmPivot.add(tip);
+            }
+
+            // GORE: Arm wound
+            const armWoundGeo = new THREE.BoxGeometry(0.45, 0.35, 0.15);
+            const armWound = new THREE.Mesh(armWoundGeo, rawFleshMat);
+            armWound.position.set(0.42, -1.0, 0);
+            lArmPivot.add(armWound);
+
+            zombieGroup.add(lArmPivot);
+
+            const rArmPivot = new THREE.Group();
+            rArmPivot.position.set(1.8, 4.0, 0);
+            const rArmMesh = lArmMesh.clone();
+            rArmPivot.add(rArmMesh);
+            for(let f = 0; f < 3; f++) {
+                const fingerGeo = new THREE.BoxGeometry(0.14, 0.55, 0.14);
+                const finger = new THREE.Mesh(fingerGeo, boneMat);
+                finger.position.set(-0.22 + f * 0.22, -3.75, 0.08);
+                finger.rotation.x = -0.25;
+                rArmPivot.add(finger);
+                const tipGeo = new THREE.BoxGeometry(0.1, 0.22, 0.1);
+                const tip = new THREE.Mesh(tipGeo, brightFleshMat);
+                tip.position.set(-0.22 + f * 0.22, -4.12, 0.08);
+                rArmPivot.add(tip);
+            }
+            const rArmWound = armWound.clone();
+            rArmWound.position.x = -0.42;
+            rArmPivot.add(rArmWound);
+            zombieGroup.add(rArmPivot);
+
+            // ── LEGS ──────────────────────────────────────────────────────────
+            const lLegPivot = new THREE.Group();
+            lLegPivot.position.set(-0.8, 0.8, 0);
+            const legGeo = new THREE.BoxGeometry(0.9, 2.4, 0.9);
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x1f272a, roughness: 0.9 });
+            const lLegMesh = new THREE.Mesh(legGeo, legMat);
+            lLegMesh.position.y = -1.1;
+            lLegMesh.castShadow = true;
+            lLegPivot.add(lLegMesh);
+            // GORE: Blackened necrotic foot
+            const footGeo = new THREE.BoxGeometry(0.8, 0.28, 1.1);
+            const lFoot = new THREE.Mesh(footGeo, blackMat);
+            lFoot.position.set(0, -2.38, 0.2);
+            lLegPivot.add(lFoot);
+            zombieGroup.add(lLegPivot);
+
+            const rLegPivot = new THREE.Group();
+            rLegPivot.position.set(0.8, 0.8, 0);
+            const rLegMesh = lLegMesh.clone();
+            rLegPivot.add(rLegMesh);
+            const rFoot = lFoot.clone();
+            rLegPivot.add(rFoot);
+            zombieGroup.add(rLegPivot);
+
+            // Scale and Positioning
+            const scale = isBoss ? 4.5 : (0.85 + Math.random() * 0.3);
+            zombieGroup.scale.set(scale, scale, scale);
+
+            // Spawning coordinate selection (randomly select one of the three red doors)
+            let spawnX = 0;
+            let spawnZ = -120;
+            if (isBoss) {
+                spawnX = 0; // Boss always emerges from the center door
+            } else {
+                const doorIdx = Math.floor(Math.random() * 3);
+                spawnX = doorPositions[doorIdx];
+            }
+            zombieGroup.position.set(spawnX, 0, spawnZ);
+
+            scene.add(zombieGroup);
+
+            // Set HP from configuration constants
+            let maxHp = Math.round(10 * mutantZombieHPMult);
+            if (isBoss) {
+                maxHp = bossHPConfig[bossStage];
+            }
+
+            const zObject = {
+                group: zombieGroup,
+                collisionMesh: torso,
+                isBoss: isBoss,
+                health: maxHp,
+                maxHealth: maxHp,
+                speed: isBoss ? (bossStage >= 2 ? 0.09 : 0.12) : (currentZombieSpeed * mutantZombieSpeedMult * (0.8 + Math.random() * 0.4)),
+                radius: isBoss ? 9.5 : 3.2,
+                lArm: lArmPivot,
+                rArm: rArmPivot,
+                lLeg: lLegPivot,
+                rLeg: rLegPivot,
+                clawTimer: 0,
+                stompTimer: 0,
+                animSpeed: 4.0 + Math.random() * 2.0
+            };
+
+            zombies.push(zObject);
+            playGroanSound(isBoss);
+        }
+
+        // Fire Bullet from Gun barrel
+        function fireBullet() {
+            // Recoil animation pushback
+            recoilOffset = 1.0;
+
+            // Flash visual
+            muzzleFlashMesh.visible = true;
+            muzzleFlashMesh.scale.set(1, 1, 1 + Math.random()*0.5);
+
+            // Determine bullet origin from actual barrel positions
+            const forwardDir = new THREE.Vector3(0, 0, -1).applyQuaternion(turretBarrel.quaternion).normalize();
+            
+            // Offset slightly forward to muzzle tip
+            const origin = new THREE.Vector3()
+                .copy(turretGroup.position)
+                .add(turretBarrel.position)
+                .addScaledVector(forwardDir, 8.5);
+
+            // Left/Right barrel alternate offset
+            const sideDir = new THREE.Vector3(1, 0, 0).applyQuaternion(turretBarrel.quaternion).normalize();
+            const alternateSide = (fireRateCounter % 2 === 0) ? -0.6 : 0.6;
+            origin.addScaledVector(sideDir, alternateSide);
+
+            // Ballistic tier upgrades bullet visuals, speed and damage
+            let bulletColor, bulletSize, bulletSpeed, bulletDamage;
+            if (!ballisticBulletsActive) {
+                bulletColor = 0xffcc00; bulletSize = 0.48; bulletSpeed = 6.0; bulletDamage = 15;
+            } else if (ballisticTier === 0) {
+                bulletColor = 0xff2200; bulletSize = 0.95; bulletSpeed = 7.6;  bulletDamage = 120;
+            } else if (ballisticTier === 1) {
+                bulletColor = 0xff6600; bulletSize = 1.25; bulletSpeed = 9.5;  bulletDamage = 280;  // TIER 2: Upgraded after Boss 2
+            } else {
+                bulletColor = 0xffffff; bulletSize = 1.65; bulletSpeed = 12.5; bulletDamage = 9999; // TIER 3 MAX: After Boss 3 — one-shot everything
+            }
+
+            const bulletGeo = new THREE.SphereGeometry(bulletSize, 8, 8);
+            const bulletMat = new THREE.MeshBasicMaterial({ color: bulletColor });
+            const bulletMesh = new THREE.Mesh(bulletGeo, bulletMat);
+            bulletMesh.position.copy(origin);
+            scene.add(bulletMesh);
+
+            bullets.push({
+                mesh: bulletMesh,
+                dir: forwardDir,
+                speed: bulletSpeed,
+                life: 110,
+                damage: bulletDamage
+            });
+
+            playShotSound();
+        }
+
+        // Ballistic Area of Effect Explosive Blast (scales with ballisticTier)
+        function triggerBallisticExplosion(pos) {
+            playExplosionSound();
+
+            // Tier-scaled explosion visual size and blast radius
+            const tierScale  = [18.0, 28.0, 42.0]; // Tier 0 / 1 / 2
+            const tierRadius = [25.0, 38.0, 60.0];
+            const tierDmg    = [250,  600,  99999];
+            const tierColor  = [0xff4400, 0xff8800, 0xffffff];
+            const t = Math.min(ballisticTier, 2);
+
+            const maxExplScale = tierScale[t];
+            const explGeo = new THREE.SphereGeometry(1.0, 16, 16);
+            const explMat = new THREE.MeshBasicMaterial({
+                color: tierColor[t],
+                transparent: true,
+                opacity: 0.85,
+                blending: THREE.AdditiveBlending
+            });
+            const explMesh = new THREE.Mesh(explGeo, explMat);
+            explMesh.position.copy(pos);
+            scene.add(explMesh);
+
+            explosions.push({
+                mesh: explMesh,
+                scale: 1.0,
+                maxScale: maxExplScale,
+                speed: 1.2 + t * 0.4
+            });
+
+            // Spray fire/glowing spark particles (count scales with tier)
+            const sparkCount = 10 + ballisticTier * 6;
+            for(let i = 0; i < sparkCount; i++) {
+                const sparkGeo = new THREE.BoxGeometry(0.5 + ballisticTier * 0.3, 0.5 + ballisticTier * 0.3, 0.5 + ballisticTier * 0.3);
+                const sparkMat = new THREE.MeshBasicMaterial({
+                    color: ballisticTier === 2 ? 0xffffff : (Math.random() > 0.4 ? 0xff2200 : 0xffaa00)
+                });
+                const spark = new THREE.Mesh(sparkGeo, sparkMat);
+                spark.position.copy(pos);
+                scene.add(spark);
+
+                particles.push({
+                    mesh: spark,
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * (4.2 + ballisticTier * 3),
+                        Math.random() * 3.5 + 1.0,
+                        (Math.random() - 0.5) * (4.2 + ballisticTier * 3)
+                    ),
+                    life: 1.0,
+                    decay: 0.03 + Math.random()*0.03
+                });
+            }
+
+            // Deal damage to nearby zombies in splash zone (radius and damage scale with tier)
+            const blastRadius = tierRadius[t];
+            const bossSplashDmg = tierDmg[t];
+            const checkPos = new THREE.Vector3();
+            for (let k = zombies.length - 1; k >= 0; k--) {
+                const zombie = zombies[k];
+                const zx = zombie.group.position.x;
+                const zz = zombie.group.position.z;
+
+                const dx = pos.x - zx;
+                const dz = pos.z - zz;
+                const distXZ = Math.sqrt(dx*dx + dz*dz);
+
+                if (distXZ <= blastRadius) {
+                    if (!zombie.isBoss) {
+                        zombie.health = 0;
+                    } else {
+                        zombie.health -= bossSplashDmg;
+                    }
+
+                    const zy = zombie.group.position.y + 2.2 * zombie.group.scale.y;
+                    checkPos.set(zx, zy, zz);
+                    spawnBloodSpurt(checkPos, new THREE.Vector3(
+                        (zx - pos.x)*0.2,
+                        2.5,
+                        (zz - pos.z)*0.2
+                    ));
+
+                    if (zombie.health <= 0) {
+                        killZombieGore(zombie);
+                        zombies.splice(k, 1);
+                    }
+                }
+            }
+        }
+
+        // Spawn hit blood sparks / spray (optimized particle count from 20 to 6 for performance)
+        function spawnBloodSpurt(pos, forceVector) {
+            // Mix of dark clotted blood, bright arterial red, and bone-chip white
+            const bloodPalette = [0x8a0000, 0xcc1100, 0x500000, 0x3a0000, 0xd0cfc0];
+            const count = 7 + Math.floor(Math.random() * 5);
+            for(let i = 0; i < count; i++) {
+                const size = 0.15 + Math.random() * 0.35;
+                const bloodGeo = new THREE.BoxGeometry(size, size * (0.5 + Math.random()), size);
+                const col = bloodPalette[Math.floor(Math.random() * bloodPalette.length)];
+                const bloodMat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.97 });
+                const bloodParticle = new THREE.Mesh(bloodGeo, bloodMat);
+                bloodParticle.position.copy(pos);
+                // Random rotational orientation so drops look irregular
+                bloodParticle.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+                scene.add(bloodParticle);
+
+                particles.push({
+                    mesh: bloodParticle,
+                    velocity: new THREE.Vector3(
+                        forceVector.x * (0.5 + Math.random()) + (Math.random()-0.5) * 2.5,
+                        forceVector.y * (0.6 + Math.random()) + Math.random() * 2.2,
+                        forceVector.z * (0.5 + Math.random()) + (Math.random()-0.5) * 2.5
+                    ),
+                    life: 1.0,
+                    decay: 0.025 + Math.random() * 0.025
+                });
+            }
+
+            // Immediately enforce particle limit to prevent lag
+            if (particles.length > 80) {
+                const old = particles.shift();
+                scene.remove(old.mesh);
+            }
+        }
+
+        // Handle zombie death (dismember into gibs, make blood splat)
+        function killZombieGore(zombie) {
+            const zombiePos = new THREE.Vector3();
+            zombiePos.copy(zombie.group.position);
+            zombiePos.y += 2.2 * zombie.group.scale.y;
+
+            // ── GROUND BLOOD POOLS ──────────────────────────────────────────
+            // Multiple overlapping splatters to make the kill spot look drenched
+            const poolCount = zombie.isBoss ? 6 : 3;
+            for(let p = 0; p < poolCount; p++) {
+                const ox = (Math.random()-0.5) * (zombie.isBoss ? 5 : 2);
+                const oz = (Math.random()-0.5) * (zombie.isBoss ? 5 : 2);
+                spawnBloodSplatter(
+                    zombiePos.x + ox,
+                    zombie.group.position.z + oz,
+                    zombie.isBoss ? 3.5 + Math.random()*2 : 0.8 + Math.random()*1.2
+                );
+            }
+
+            // ── GIBS ────────────────────────────────────────────────────────
+            // Flesh chunks (dark red), bone shards (off-white), cloth scraps (dark)
+            const gibPalette = [
+                { color: 0x6e0000, rough: 0.95 }, // wet meat
+                { color: 0x8a0303, rough: 0.95 }, // bright blood chunk
+                { color: 0xd0c8b0, rough: 0.7  }, // bone shard
+                { color: 0x2e3538, rough: 0.95 }, // cloth scrap
+                { color: 0x1a0808, rough: 0.95 }, // charred flesh
+            ];
+            const partsToSpawn = zombie.isBoss ? 7 : 4;
+            for(let i = 0; i < partsToSpawn; i++) {
+                const palette = gibPalette[Math.floor(Math.random() * gibPalette.length)];
+                const sx = 0.3 + Math.random() * 0.9;
+                const sy = 0.25 + Math.random() * 0.7;
+                const sz = 0.25 + Math.random() * 0.7;
+                const gibGeo = new THREE.BoxGeometry(sx, sy, sz);
+                const gibMat = new THREE.MeshStandardMaterial({ color: palette.color, roughness: palette.rough });
+                const gibMesh = new THREE.Mesh(gibGeo, gibMat);
+                gibMesh.position.copy(zombiePos);
+                gibMesh.position.x += (Math.random()-0.5) * zombie.group.scale.x * 1.5;
+                gibMesh.position.y += Math.random() * 2.0;
+                gibMesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+                scene.add(gibMesh);
+
+                gibs.push({
+                    mesh: gibMesh,
+                    velocity: new THREE.Vector3(
+                        (Math.random()-0.5) * (zombie.isBoss ? 8 : 5.5),
+                        Math.random() * 5.5 + 2.5,
+                        (Math.random()-0.5) * (zombie.isBoss ? 8 : 5.5) - zombie.speed * 2
+                    ),
+                    rotSpeed: new THREE.Vector3(
+                        (Math.random()-0.5) * 18,
+                        (Math.random()-0.5) * 18,
+                        (Math.random()-0.5) * 18
+                    ),
+                    life: 1.0
+                });
+            }
+
+            // ── BLOOD JETS ──────────────────────────────────────────────────
+            // High-pressure blood jets in 8 radial directions
+            const jetCount = zombie.isBoss ? 16 : 8;
+            for(let j = 0; j < jetCount; j++) {
+                const angle = (j / jetCount) * Math.PI * 2;
+                const power = zombie.isBoss ? 7.0 : 3.5;
+                spawnBloodSpurt(zombiePos, new THREE.Vector3(
+                    Math.cos(angle) * power,
+                    1.5 + Math.random() * 2.0,
+                    Math.sin(angle) * power
+                ));
+            }
+
+            // Award Score points
+            if (zombie.isBoss) {
+                score += 3500;
+                bossesKilled++;
+                bossActive = false;
+                document.getElementById('boss-health-card').style.display = "none";
+
+                if (bossesKilled === 1) {
+                    // Boss 1 killed — standard ballistic already active, no upgrade yet
+                    showBanner("ALPHA GOLIATH ANNIHILATED! PREPARE FOR WORSE...");
+
+                } else if (bossesKilled === 2) {
+                    // Boss 2 killed — upgrade ballistic bullets to Tier 1
+                    ballisticTier = 1;
+                    document.getElementById('weapon-status').innerHTML = "CALIBER: 40MM HYPER-BALLISTIC";
+                    document.getElementById('weapon-status').style.color = "#ff8800";
+                    document.getElementById('weapon-status').style.textShadow = "0 0 14px #ff8800";
+                    showBanner("MUTATED BEHEMOTH DOWN! HYPER-BALLISTIC ROUNDS LOADED!");
+
+                } else if (bossesKilled >= 3) {
+                    // Boss 3 killed — MAX OUT ballistic bullets to Tier 2
+                    ballisticTier = 2;
+                    document.getElementById('weapon-status').innerHTML = "CALIBER: OMEGA NUKE ROUNDS [MAX]";
+                    document.getElementById('weapon-status').style.color = "#ffffff";
+                    document.getElementById('weapon-status').style.textShadow = "0 0 20px #ffffff, 0 0 40px #ff4400";
+                    // Zombies mutate: much more HP but far slower (half speed)
+                    mutantZombieHPMult  = 8.0;  // 8× more HP on regular zombies
+                    mutantZombieSpeedMult = 0.45; // 55% slower
+                    showBanner("THE ABOMINATION SLAIN! OMEGA NUKE ROUNDS ONLINE — ZOMBIE MUTATION DETECTED!");
+
+                    if (!endlessMode) {
+                        triggerVictory();
+                    }
+                }
+            } else {
+                score += 150;
+            }
+
+            document.getElementById('score-display').innerHTML = score;
+            scene.remove(zombie.group);
+        }
+
+        // Spawn flat ground blood pooling decal
+        function spawnBloodSplatter(x, z, sizeMultiplier = 1.0) {
+            const radius = (1.5 + Math.random() * 2.2) * sizeMultiplier;
+            const splatterGeo = new THREE.CircleGeometry(radius, 8);
+            const splatterMat = new THREE.MeshBasicMaterial({
+                color: 0x480303,
+                transparent: true,
+                opacity: 0.85,
+                depthWrite: false
+            });
+            const splatter = new THREE.Mesh(splatterGeo, splatterMat);
+            splatter.rotation.x = -Math.PI / 2;
+            
+            // Random tiny Y offset to prevent overlapping mesh z-fighting
+            splatter.position.set(x, 0.05 + Math.random() * 0.015, z);
+            scene.add(splatter);
+
+            bloodSplatters.push({
+                mesh: splatter,
+                life: 1.0,
+                decay: 0.0012
+            });
+
+            // Prevent resource bloat - keep max 60 splatters (optimized down from 160)
+            if(bloodSplatters.length > 60) {
+                const old = bloodSplatters.shift();
+                scene.remove(old.mesh);
+            }
+        }
+
+        // Display large text alerts
+        function showBanner(text) {
+            const banner = document.getElementById('notification-banner');
+            banner.innerHTML = text;
+            banner.style.display = "block";
+            
+            // Restart keyframe animation
+            banner.style.animation = 'none';
+            banner.offsetHeight; // trigger reflow
+            banner.style.animation = null;
+
+            setTimeout(() => {
+                banner.style.display = "none";
+            }, 3000);
+        }
+
+        // Aim logic using raycasting down onto floor grid
+        function updateAim() {
+            raycaster.setFromCamera(mouse, camera);
+            if (raycaster.ray.intersectPlane(groundAimPlane, planeIntersection)) {
+                // Calculate rotation angle of barrels
+                let dx = planeIntersection.x - turretGroup.position.x;
+                let dz = planeIntersection.z - turretGroup.position.z;
+                let targetAngle = Math.atan2(-dx, -dz);
+
+                // Limit traverse sweep sweep limits to prevent player looking backwards
+                let maxSweepAngle = 1.35; 
+                targetAngle = Math.max(-maxSweepAngle, Math.min(maxSweepAngle, targetAngle));
+                
+                turretBarrel.rotation.y = targetAngle;
+
+                // Update spotlight target tracking
+                flashlightSpotlight.target.position.copy(planeIntersection);
+            }
+        }
+
+        // Handle input coordinate updates
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onTouchMove(event) {
+            if (event.touches.length > 0) {
+                updateInputCoords(event.touches[0]);
+            }
+        }
+
+        function updateInputCoords(touch) {
+            mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Flashes screen blood vignette
+        function flashDamageVignette() {
+            const overlay = document.getElementById('blood-overlay');
+            overlay.style.boxShadow = "inset 0 0 100px rgba(139, 0, 0, 0.95)";
+            
+            // Screen Shake trigger on damage
+            screenShakeAmount = 1.2;
+
+            setTimeout(() => {
+                overlay.style.boxShadow = "inset 0 0 100px rgba(139, 0, 0, 0)";
+            }, 180);
+        }
+
+        // Game Update Loop
+        function updateGame() {
+            if (!gameActive || gameEnded) return;
+
+            time += 0.016;
+
+            // Recoil recovery
+            if(recoilOffset > 0) {
+                recoilOffset *= 0.8;
+                turretBarrel.position.z = recoilOffset;
+            } else {
+                turretBarrel.position.z = 0;
+            }
+
+            // Hide muzzle flash after 1 frame
+            if (muzzleFlashMesh.visible) {
+                muzzleFlashMesh.visible = false;
+            }
+
+            // Handle machine gun fire timing (insanely fast shooting)
+            if (isMouseDown) {
+                fireRateCounter++;
+                const triggerInterval = ballisticBulletsActive ? 1 : 2;
+                if (fireRateCounter % triggerInterval === 0) {
+                    firePointFlashLight();
+                    fireBullet();
+                }
+            } else {
+                fireRateCounter = 0;
+            }
+
+            // Flashlight slight micro-flicker for creepy realism
+            if (Math.random() > 0.98) {
+                flashlightSpotlight.intensity = 4.0 + Math.random() * 4.0;
+            } else {
+                flashlightSpotlight.intensity = 10.0;
+            }
+
+            // Spawning Core Logic & Progression
+            updateProgressionAndWaves();
+
+            // Fire barrel particle sparks and light flicker
+            updateFireBarrels();
+
+            // Entities update
+            updateExplosions();
+            updateParticles();
+            updateGibs();
+            updateBullets();
+            updateZombies();
+
+            // Camera screen shake rendering adjustment
+            if (screenShakeAmount > 0.05) {
+                camera.position.x = (Math.random() - 0.5) * screenShakeAmount;
+                camera.position.y = 15 + (Math.random() - 0.5) * screenShakeAmount; // Keep relative to 15 height
+                screenShakeAmount *= 0.88; // decay
+            } else {
+                camera.position.set(0, 15, 60);
+            }
+
+            updateAim();
+        }
+
+        // Flash flashlight bright on fire
+        function firePointFlashLight() {
+            flashlightSpotlight.intensity = 20.0;
+            setTimeout(() => {
+                flashlightSpotlight.intensity = 10.0;
+            }, 30);
+        }
+
+        // Handles difficulty curves, levels, weapon upgrade, and boss triggers
+        function updateProgressionAndWaves() {
+            // Level Progression based on Score
+            let newThreat = 1;
+            if (score >= 10000) {
+                newThreat = 5;
+            } else if (score >= 6000) {
+                newThreat = 4;
+            } else if (score >= 3000) {
+                newThreat = 3;
+            } else if (score >= 1000) {
+                newThreat = 2;
+            }
+
+            // Handle threat level increase
+            if (newThreat > threatLevel) {
+                threatLevel = newThreat;
+                document.getElementById('threat-display').innerHTML = threatLevel;
+                playUpgradeSound();
+                
+                if (threatLevel === 5) {
+                    ballisticBulletsActive = true;
+                    document.getElementById('threat-display').innerHTML = "5 [MAX]";
+                    document.getElementById('weapon-status').innerHTML = "CALIBER: 20MM BALLISTIC HE";
+                    document.getElementById('weapon-status').style.color = "#ff3300";
+                    document.getElementById('weapon-status').style.textShadow = "0 0 10px #ff3300";
+                    showBanner("BALLISTIC EXPLOSIVE ROUNDS LOADED!");
+                } else {
+                    showBanner(`THREAT LEVEL INCREASED TO ${threatLevel}`);
+                }
+            }
+
+            // Adjust difficulty parameters based on Threat level (Increased swarm counts)
+            if (!bossActive) {
+                if (threatLevel === 1) {
+                    spawnRate = 50;
+                    currentZombieSpeed = baseZombieSpeed;
+                } else if (threatLevel === 2) {
+                    spawnRate = 35;
+                    currentZombieSpeed = baseZombieSpeed * 1.35;
+                } else if (threatLevel === 3) {
+                    spawnRate = 24;
+                    currentZombieSpeed = baseZombieSpeed * 1.7;
+                } else if (threatLevel === 4) {
+                    spawnRate = 14;
+                    currentZombieSpeed = baseZombieSpeed * 2.1;
+                } else { // Threat 5+ (Continuous swarm!)
+                    spawnRate = 6;
+                    currentZombieSpeed = baseZombieSpeed * 2.6;
+                }
+            }
+
+            // Boss Spawning Trigger Checks (Level 5+)
+            if (threatLevel === 5 && !bossActive) {
+                if (bossStage < 3 && score >= bossMilestones[bossStage]) {
+                    triggerBossFight();
+                }
+            }
+
+            // Handle Normal Zombie Spawn timer
+            if (!bossActive) {
+                spawnTimer++;
+                if (spawnTimer >= spawnRate) {
+                    spawnZombie(false);
+                    spawnTimer = 0;
+                }
+            }
+        }
+
+        // Trigger Boss Fight state
+        function triggerBossFight() {
+            bossActive = true;
+            playAlarmSound();
+
+            // Boss 1: standard alarm. Boss 2 & 3: bigger, scarier, different banner + ambient
+            if (bossStage === 0) {
+                showBanner("CRITICAL ALARM: ALPHA GOLIATH APPROACHES!");
+                ambientLight.color.setHex(0x550000);
+            } else if (bossStage === 1) {
+                showBanner("⚠ DANGER: MUTATED BEHEMOTH DETECTED — BIGGER. MEANER.");
+                ambientLight.color.setHex(0x660022);
+            } else {
+                showBanner("☠ FINAL WARNING: THE ABOMINATION HAS ARRIVED — HEAVEN HELP YOU");
+                ambientLight.color.setHex(0x220044);
+            }
+
+            // Stampede and disintegrate close standard zombies
+            for (let i = zombies.length - 1; i >= 0; i--) {
+                scene.remove(zombies[i].group);
+            }
+            zombies = [];
+
+            // Spawn giant boss (scale increases per stage)
+            spawnZombie(true);
+            bossEntity = zombies[zombies.length - 1];
+
+            // Boss 2 and 3 are physically larger
+            if (bossStage === 1) {
+                bossEntity.group.scale.multiplyScalar(1.45); // 45% bigger than boss 1
+                bossEntity.radius *= 1.45;
+            } else if (bossStage === 2) {
+                bossEntity.group.scale.multiplyScalar(2.1);  // More than double boss 1 size
+                bossEntity.radius *= 2.1;
+                bossEntity.speed *= 0.75; // Slower but devastating
+            }
+
+            // Render health overlay
+            const bossCard = document.getElementById('boss-health-card');
+            const bossName = document.getElementById('boss-name');
+            bossCard.style.display = "block";
+
+            if (bossStage === 0) bossName.innerHTML = "☠ ALPHA GOLIATH — LEVEL 1";
+            if (bossStage === 1) bossName.innerHTML = "💀 MUTATED BEHEMOTH — LEVEL 2 [EVOLVED]";
+            if (bossStage === 2) bossName.innerHTML = "👁 THE ABOMINATION — FINAL FORM [ULTIMATE]";
+
+            // Increment stage for next milestone check
+            bossStage++;
+        }
+
+        // Handle Fire barrel graphics and pointlight flickering
+        function updateFireBarrels() {
+            fireParticles.forEach(barrel => {
+                // Flicker light intensity
+                barrel.light.intensity = 4.0 + Math.random() * 2.5;
+
+                // Spawn micro sparks rising from fire barrel
+                barrel.spawnTimer++;
+                if(barrel.spawnTimer >= 6) {
+                    const sparkGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+                    const sparkMat = new THREE.MeshBasicMaterial({ 
+                        color: Math.random() > 0.4 ? 0xff6600 : 0xffaa00, 
+                        transparent: true,
+                        opacity: 0.9 
+                    });
+                    const spark = new THREE.Mesh(sparkGeo, sparkMat);
+                    
+                    const offset = (Math.random() - 0.5) * 0.8;
+                    spark.position.copy(barrel.barrelPos).add(new THREE.Vector3(offset, 0, (Math.random()-0.5)*0.8));
+                    scene.add(spark);
+
+                    particles.push({
+                        mesh: spark,
+                        velocity: new THREE.Vector3((Math.random()-0.5)*0.3, Math.random()*1.0 + 0.5, (Math.random()-0.5)*0.3),
+                        life: 1.0,
+                        decay: 0.04
+                    });
+                    barrel.spawnTimer = 0;
+                }
+            });
+        }
+
+        // Update Exploding visual spherical expansions
+        function updateExplosions() {
+            for(let i = explosions.length - 1; i >= 0; i--) {
+                const exp = explosions[i];
+                exp.scale += exp.speed;
+                exp.mesh.scale.set(exp.scale, exp.scale, exp.scale);
+                exp.mesh.material.opacity = 1.0 - (exp.scale / exp.maxScale);
+
+                if (exp.scale >= exp.maxScale) {
+                    scene.remove(exp.mesh);
+                    explosions.splice(i, 1);
+                }
+            }
+        }
+
+        // Update particles (sparks, fire, blood spray) affected by gravity
+        function updateParticles() {
+            for(let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.mesh.position.add(p.velocity);
+                
+                // Gravity pull
+                p.velocity.y -= 0.14; 
+                p.life -= p.decay;
+                p.mesh.material.opacity = p.life;
+
+                // Ground splatter hit check
+                if(p.mesh.position.y <= 0.06) {
+                    // Small blood splatter on floor
+                    if(p.mesh.material.color && p.mesh.material.color.r > 0.3 && p.mesh.material.color.g === 0) {
+                        spawnBloodSplatter(p.mesh.position.x, p.mesh.position.z, 0.4);
+                    }
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                }
+                else if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // Update dismembered body flying chunks
+        function updateGibs() {
+            for(let i = gibs.length - 1; i >= 0; i--) {
+                const g = gibs[i];
+                g.mesh.position.add(g.velocity);
+                
+                // Rotate gib
+                g.mesh.rotation.x += g.rotSpeed.x * 0.016;
+                g.mesh.rotation.y += g.rotSpeed.y * 0.016;
+                g.mesh.rotation.z += g.rotSpeed.z * 0.016;
+
+                // Gravity pull
+                g.velocity.y -= 0.18;
+
+                if (g.mesh.position.y <= 0.28) {
+                    spawnBloodSplatter(g.mesh.position.x, g.mesh.position.z, 1.15);
+                    scene.remove(g.mesh);
+                    gibs.splice(i, 1);
+                }
+            }
+        }
+
+        // Update bullets tracer flight
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.mesh.position.addScaledVector(b.dir, b.speed);
+                b.life--;
+
+                if (b.life <= 0 || b.mesh.position.z < -160 || b.mesh.position.z > 50) {
+                    scene.remove(b.mesh);
+                    bullets.splice(i, 1);
+                }
+            }
+        }
+
+        // Update Zombie coordinates, animation sweeps, attack and boss screen shake thumps
+        function updateZombies() {
+            if (!bossActive && ambientLight.color.r > 0.3) {
+                ambientLight.color.setHex(0x352b30);
+            }
+
+            const checkPos = new THREE.Vector3();
+
+            for (let z = zombies.length - 1; z >= 0; z--) {
+                const zombie = zombies[z];
+                const zx = zombie.group.position.x;
+                const zz = zombie.group.position.z;
+
+                // Swing legs/arms animations during walk
+                const swing = Math.sin(time * zombie.animSpeed);
+                
+                if (zombie.group.position.z < 29.5) {
+                    // Advance forward
+                    zombie.group.position.z += zombie.speed;
+
+                    // Leg swings
+                    zombie.lLeg.rotation.x = swing * 0.65;
+                    zombie.rLeg.rotation.x = -swing * 0.65;
+                    
+                    // Zombie hands raised
+                    zombie.lArm.rotation.x = -1.1 + swing * 0.25;
+                    zombie.rArm.rotation.x = -1.1 - swing * 0.25;
+
+                    // GORE: Spawn trail of dripping blood droplets as they walk forward
+                    if (Math.random() > 0.93) {
+                        checkPos.set(zx + (Math.random()-0.5)*1.5, zombie.group.position.y + Math.random()*3.5, zz + (Math.random()-0.5)*1.5);
+                        spawnBloodSpurt(checkPos, new THREE.Vector3(0, -0.4, 0));
+                    }
+
+                    // Boss Stomp Sound & Screen shake logic
+                    if (zombie.isBoss) {
+                        zombie.stompTimer++;
+                        if (zombie.stompTimer % 70 === 0) {
+                            playStompSound();
+                            screenShakeAmount = 2.0;
+                            spawnDustRing(zx, zz);
+                        }
+
+                        // GORE: Pulse the massive beating heart inside the boss's chest
+                        const heart = zombie.group.getObjectByName("boss_heart");
+                        if (heart) {
+                            const pulse = 1.0 + Math.sin(time * 11.0) * 0.18;
+                            heart.scale.set(pulse, pulse, pulse);
+                        }
+                    }
+                } else {
+                    // Reached barricade wall: Claw and damage it
+                    zombie.group.position.z = 29.5;
+                    
+                    // Stand still legs
+                    zombie.lLeg.rotation.x = 0;
+                    zombie.rLeg.rotation.x = 0;
+
+                    // Claw hands rapid swinging animation
+                    const clawSwing = Math.sin(time * 24.0);
+                    zombie.lArm.rotation.x = -1.5 + clawSwing * 0.8;
+                    zombie.rArm.rotation.x = -1.5 - clawSwing * 0.8;
+
+                    zombie.clawTimer++;
+                    if (zombie.clawTimer >= 55) { // damage barricade every 0.9 sec
+                        playClawSound();
+                        
+                        const damage = zombie.isBoss ? 40 : 5;
+                        barricadeHP = Math.max(0, barricadeHP - damage);
+                        document.getElementById('health-fill').style.width = `${(barricadeHP / maxBarricadeHP) * 100}%`;
+                        
+                        flashDamageVignette();
+                        zombie.clawTimer = 0;
+
+                        // Check Game Over
+                        if (barricadeHP <= 0) {
+                            triggerGameOver();
+                        }
+                    }
+                }
+
+                // Check bullets hits against this zombie (Fast 2D X-Z coordinate arithmetic)
+                for (let b = bullets.length - 1; b >= 0; b--) {
+                    const bullet = bullets[b];
+                    const bx = bullet.mesh.position.x;
+                    const bz = bullet.mesh.position.z;
+
+                    const dx = bx - zx;
+                    const dz = bz - zz;
+                    const distXZ = Math.sqrt(dx*dx + dz*dz);
+
+                    if (distXZ < zombie.radius) {
+                        // Apply damage (Small zombies die instantly on first bullet touch)
+                        if (!zombie.isBoss) {
+                            zombie.health = 0;
+                        } else {
+                            zombie.health -= bullet.damage;
+                        }
+
+                        // Blood splatter particles
+                        const zy = zombie.group.position.y + 2.2 * zombie.group.scale.y;
+                        checkPos.set(bx, zy, bz);
+                        spawnBloodSpurt(checkPos, new THREE.Vector3(bullet.dir.x * 2.0, 1.2, bullet.dir.z * 2.0));
+
+                        // Remove bullet mesh
+                        scene.remove(bullet.mesh);
+                        bullets.splice(b, 1);
+
+                        // Update Boss Health Bar GUI if Boss is damaged
+                        if (zombie.isBoss) {
+                            const healthPct = Math.max(0, (zombie.health / zombie.maxHealth) * 100);
+                            document.getElementById('boss-health-fill').style.width = `${healthPct}%`;
+                        }
+
+                        // Check Death
+                        if (zombie.health <= 0) {
+                            killZombieGore(zombie);
+                            zombies.splice(z, 1);
+                            break; // exit bullet check for this zombie
+                        }
+
+                        // If bullet was ballistic, trigger area blast!
+                        if (ballisticBulletsActive) {
+                            triggerBallisticExplosion(checkPos);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Spawn grey dust shockwave ring on Boss stomp feet
+        function spawnDustRing(x, z) {
+            const ringGeo = new THREE.RingGeometry(0.5, 4.5, 16);
+            const ringMat = new THREE.MeshBasicMaterial({ 
+                color: 0x5a2d2d, // red dust
+                transparent: true, 
+                opacity: 0.65, 
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.set(x, 0.1, z);
+            scene.add(ring);
+
+            explosions.push({
+                mesh: ring,
+                scale: 1.0,
+                maxScale: 3.5,
+                speed: 0.15
+            });
+        }
+
+        // Start Game from Main Menu
+        function startGame() {
+            initAudio();
+            document.getElementById('main-menu').style.display = "none";
+            gameActive = true;
+            showBanner("DEFENSE GRID ACTIVE");
+        }
+
+        // Restart Game
+        function restartGame() {
+            initAudio();
+            
+            // Clean up 3D meshes
+            bullets.forEach(b => scene.remove(b.mesh));
+            zombies.forEach(z => scene.remove(z.group));
+            particles.forEach(p => scene.remove(p.mesh));
+            gibs.forEach(g => scene.remove(g.mesh));
+            bloodSplatters.forEach(s => scene.remove(s.mesh));
+            explosions.forEach(e => scene.remove(e.mesh));
+
+            bullets = [];
+            zombies = [];
+            particles = [];
+            gibs = [];
+            bloodSplatters = [];
+            explosions = [];
+
+            // Reset States
+            score = 0;
+            barricadeHP = 100;
+            threatLevel = 1;
+            bossActive = false;
+            bossStage = 0;
+            bossesKilled = 0;
+            endlessMode = false;
+            ballisticBulletsActive = false;
+            spawnTimer = 0;
+
+            document.getElementById('score-display').innerHTML = "0";
+            document.getElementById('threat-display').innerHTML = "1";
+            document.getElementById('health-fill').style.width = "100%";
+            document.getElementById('weapon-status').innerHTML = "CALIBER: 7.62MM AUTO";
+            document.getElementById('weapon-status').style.color = "#00ffcc";
+            document.getElementById('weapon-status').style.textShadow = "0 0 5px rgba(0, 255, 204, 0.6)";
+            
+            document.getElementById('boss-health-card').style.display = "none";
+            document.getElementById('game-over-screen').style.display = "none";
+            document.getElementById('victory-screen').style.display = "none";
+            
+            ambientLight.color.setHex(0x352b30);
+
+            gameActive = true;
+            gameEnded = false;
+            showBanner("DEFENSE OUTPOST READY");
+        }
+
+        // Trigger Game Over Screen
+        function triggerGameOver() {
+            gameActive = false;
+            gameEnded = true;
+            isMouseDown = false;
+            document.getElementById('final-stats').innerHTML = `Outpost Overrun. Final Score: <strong>${score}</strong> | Bosses Terminated: <strong>${bossesKilled}</strong>`;
+            document.getElementById('game-over-screen').style.display = "flex";
+        }
+
+        // Trigger Campaign Victory Screen
+        function triggerVictory() {
+            gameActive = false;
+            gameEnded = true;
+            isMouseDown = false;
+            document.getElementById('victory-screen').style.display = "flex";
+        }
+
+        // Play endless mode post victory
+        function continueEndless() {
+            document.getElementById('victory-screen').style.display = "none";
+            endlessMode = true;
+            gameActive = true;
+            gameEnded = false;
+            showBanner("SURVIVAL MODE ENGAGED");
+        }
+
+        // Setup 3D Scene and Start loop
+        init3D();
+
+        function gameRenderLoop() {
+            requestAnimationFrame(gameRenderLoop);
+            updateGame();
+            renderer.render(scene, camera);
+        }
+
+        gameRenderLoop();
+    </script>
+</body>
+</html>
